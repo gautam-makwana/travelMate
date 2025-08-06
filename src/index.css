@@ -1,0 +1,26 @@
+@import "tailwindcss/preflight";
+@import "tailwindcss/utilities";
+@import "tailwindcss/theme" layer(theme);
+
+/* Animated Gradient Background */
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@layer base {
+  body {
+    @apply text-white;
+    background: linear-gradient(-45deg, #06b6d4, #8b5cf6, #f43f5e, #0ea5e9);
+    background-size: 400% 400%;
+    animation: gradientShift 15s ease infinite;
+    font-family: 'Poppins', sans-serif;
+  }
+}
