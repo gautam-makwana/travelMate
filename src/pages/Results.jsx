@@ -1,14 +1,64 @@
-// src/pages/Results.jsx
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faArrowLeft, faArrowRight } from "@fortawesome/free-solid-svg-icons";
+
+// A component for the main, stackable destination card
+const SwipeableCard = ({ place, onSwipe, direction }) => {
+  const x = useMotionValue(0);
+  const scale = useTransform(x, [-300, 0, 300], [0.8, 1, 0.8]);
+  const rotate = useTransform(x, [-200, 0, 200], [-10, 0, 10]);
+
+  return (
+    <motion.div
+      drag="x"
+      dragConstraints={{ left: 0, right: 0 }}
+      onDragEnd={(event, info) => {
+        // Adjust the swipe threshold for a better user experience
+        if (info.point.x < -150) {
+          onSwipe(1); // Swipe left, go to next
+        } else if (info.point.x > 150) {
+          onSwipe(-1); // Swipe right, go to previous
+        }
+      }}
+      // These are the key animation properties for the "stacked card" effect
+      // initial: what the card looks like when it enters (from the side)
+      // animate: what the card looks like when it's in the center
+      // exit: what the card looks like when it leaves (to the other side)
+      initial={{ x: direction === 1 ? 500 : direction === -1 ? -500 : 0, opacity: 0, rotate: direction === 1 ? 20 : direction === -1 ? -20 : 0 }}
+      animate={{ x: 0, opacity: 1, rotate: 0 }}
+      exit={{ x: direction === 1 ? -500 : 500, opacity: 0, rotate: direction === 1 ? -20 : 20 }}
+      transition={{ type: "spring", stiffness: 200, damping: 20 }}
+      style={{ x, scale, rotate }}
+      // Responsive styling for the card
+      className="absolute w-full h-[450px] max-w-md lg:max-w-lg flex-shrink-0
+                 rounded-3xl shadow-2xl bg-black/40 backdrop-blur-sm
+                 border border-emerald-400 overflow-hidden cursor-grab"
+    >
+      <img
+        src={place.img}
+        alt={place.name}
+        className="w-full h-full object-cover"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex flex-col justify-end p-8">
+        <h3 className="text-3xl lg:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-200 to-white mb-2">
+          {place.name}
+        </h3>
+        <p className="text-base lg:text-lg text-gray-300">{place.desc}</p>
+      </div>
+    </motion.div>
+  );
+};
 
 export default function Results() {
   const location = useLocation();
   const navigate = useNavigate();
   const { mood } = location.state || { mood: "Relaxed" };
-  const [selected, setSelected] = useState(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [direction, setDirection] = useState(0);
+  const [showDetails, setShowDetails] = useState(false);
 
   const destinations = {
     Relaxed: [
@@ -125,7 +175,7 @@ export default function Results() {
       },
       {
         name: "Tamil Nadu",
-        img: "https://tse4.mm.bing.net/th/id/OIP.xZ6dtsTQdjhbp0yBCu0O2gHaF7?r=0&cb=thfvnext&rs=1&pid=ImgDetMain&o=7&rm=3",
+        img: "https://tse4.mm.bing.net/th/id/OIP.xZ6dtsTQdjbpcbqyBCu0O2gHaF7?r=0&cb=thfvnext&rs=1&pid=ImgDetMain&o=7&rm=3",
         desc: "Madurai, Kanchipuram, Mahabalipuram.",
       },
       {
@@ -206,78 +256,118 @@ export default function Results() {
   };
 
   const selectedPlaces = destinations[mood] || [];
+  const selectedPlace = selectedPlaces[currentIndex];
+
+  const handleSwipe = (dir) => {
+    setDirection(dir);
+    const newIndex = (currentIndex + dir + selectedPlaces.length) % selectedPlaces.length;
+    setCurrentIndex(newIndex);
+  };
 
   return (
-    <div className="min-h-screen text-white bg-gradient-to-br from-gray-900 via-purple-900 to-black">
-      <Navbar />
-      <section className="px-6 py-16 max-w-6xl mx-auto text-center">
-        <h2 className="text-4xl md:text-5xl font-bold mb-12 
-                       bg-gradient-to-r from-cyan-400 via-purple-500 to-pink-500 
-                       bg-clip-text text-transparent">
-          Top {mood} Destinations in India
-        </h2>
+    <>
+      <style>{`
+        .animated-gradient-bg {
+          background: linear-gradient(-45deg, #1A202C, #2D3748, #1A202C, #2D3748);
+          background-size: 400% 400%;
+          animation: gradient-animation 15s ease infinite;
+        }
 
-        <div className="grid md:grid-cols-3 gap-10">
-          {selectedPlaces.map((place, idx) => (
-            <motion.div
-              key={idx}
-              whileHover={{ scale: 1.05 }}
-              onClick={() => setSelected(place)}
-              className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-lg p-6 cursor-pointer border border-white/20 hover:border-cyan-400 transition"
-            >
-              <img
-                src={place.img}
-                alt={place.name}
-                className="w-full h-48 object-cover rounded-lg mb-4"
-              />
-              <h3 className="text-xl font-semibold">{place.name}</h3>
-              <p className="text-gray-300 mt-2">{place.desc}</p>
-            </motion.div>
-          ))}
-        </div>
-      </section>
+        @keyframes gradient-animation {
+          0% {
+            background-position: 0% 50%;
+          }
+          50% {
+            background-position: 100% 50%;
+          }
+          100% {
+            background-position: 0% 50%;
+          }
+        }
+      `}</style>
+      <div className="min-h-screen text-white relative animated-gradient-bg overflow-hidden flex flex-col items-center justify-center p-4">
+        {/* Dynamic Blurred Background: This div's background image changes every time a new card is selected */}
+        <motion.div
+          key={selectedPlace.name}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 1 }}
+          style={{ backgroundImage: `url(${selectedPlace.img})` }}
+          className="absolute inset-0 z-0 bg-cover bg-center filter blur-xl scale-110 opacity-30"
+        />
+        <div className="absolute inset-0 z-0 bg-black/60" />
 
-      <AnimatePresence>
-        {selected && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-md flex justify-center items-center p-6 z-50"
-            onClick={() => setSelected(null)}
+        <Navbar />
+
+        <section className="flex-1 flex flex-col items-center justify-center text-center p-6 z-10 w-full max-w-2xl">
+          <motion.h2
+            initial={{ opacity: 0, y: -40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            className="mt-10 text-3xl md:text-4xl lg:text-4xl font-extrabold mb-8
+                        bg-gradient-to-r from-cyan-400 via-purple-500 to-pink-500
+                        bg-clip-text text-transparent drop-shadow-lg"
           >
-            <motion.div
-              initial={{ scale: 0.8 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.8 }}
-              className="bg-white/10 rounded-2xl shadow-xl p-8 max-w-lg w-full text-center text-white"
-              onClick={(e) => e.stopPropagation()}
+            Top {mood} Destinations
+          </motion.h2>
+
+          {/* Card and Navigation Container */}
+          <div className="mt-0 relative w-full h-[500px] flex items-center justify-center">
+            {/* Previous Button */}
+            <motion.button
+              onClick={() => handleSwipe(-1)}
+              whileHover={{ scale: 1.1, x: -5 }}
+              whileTap={{ scale: 0.95 }}
+              className="absolute left-0 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 backdrop-blur-sm
+                         text-white text-lg z-20 hover:bg-white/20 transition-colors"
             >
-              <img
-                src={selected.img}
-                alt={selected.name}
-                className="w-full h-56 object-cover rounded-lg mb-4"
+              <FontAwesomeIcon icon={faArrowLeft} />
+            </motion.button>
+            
+            {/* This is the key component for the stacked card effect. 
+              AnimatePresence allows components (the cards) to animate in and out 
+              when they are added or removed from the React tree.
+              The `key` prop on the SwipeableCard is what tells Framer Motion to 
+              treat it as a new component, triggering the animation.
+            */}
+            <AnimatePresence initial={false} custom={direction}>
+              <SwipeableCard
+                key={selectedPlace.name}
+                place={selectedPlace}
+                onSwipe={handleSwipe}
+                direction={direction}
               />
-              <h3 className="text-2xl font-bold">{selected.name}</h3>
-              <p className="text-gray-300 mt-4">{selected.desc}</p>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() =>
-                  navigate("/trip-planner", {
-                    state: { mood, destination: selected },
-                  })
-                }
-                className="mt-6 px-8 py-3 rounded-full font-semibold 
-                           bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-400 
-                           shadow-lg transition duration-300"
-              >
-                Plan This Trip 🧳
-              </motion.button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+            </AnimatePresence>
+
+            {/* Next Button */}
+            <motion.button
+              onClick={() => handleSwipe(1)}
+              whileHover={{ scale: 1.1, x: 5 }}
+              whileTap={{ scale: 0.95 }}
+              className="absolute right-0 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 backdrop-blur-sm
+                         text-white text-lg z-20 hover:bg-white/20 transition-colors"
+            >
+              <FontAwesomeIcon icon={faArrowRight} />
+            </motion.button>
+          </div>
+
+          {/* "Plan This Trip" Button */}
+          <motion.button
+            whileHover={{ scale: 1.05, boxShadow: "0 0 30px rgba(74, 222, 128, 0.9)" }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() =>
+              navigate("/trip-planner", {
+                state: { mood, destination: selectedPlace },
+              })
+            }
+            className="mt-4 px-8 py-3 rounded-full text-lg font-bold
+                       bg-gradient-to-r from-emerald-400 to-cyan-500 text-white
+                       shadow-lg transition duration-300 z-10"
+          >
+            Plan This Trip 🧳
+          </motion.button>
+        </section>
+      </div>
+    </>
   );
 }
